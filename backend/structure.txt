@@ -1,0 +1,25 @@
+[ Incoming Request: /v1/chat/completions ]
+                                          │
+                                          ▼
+                             ┌────────────────────────┐
+                             │  FastAPI Proxy Server  │
+                             └───────────┬────────────┘
+                                         │
+                   ┌─────────────────────┴─────────────────────┐
+                   │                                           │
+                   ▼                                           ▼
+      ┌─────────────────────────┐                 ┌──────────────────────────┐
+      │  Redis Cache Engine     │                 │ PyTorch Risk Classifier  │
+      ├─────────────────────────┤                 ├──────────────────────────┤
+      │ • Check Exact / Semantic│                 │ • PII & Sensitive Scan   │
+      │   Cache Hit             │                 │ • Hallucination Risk /   │
+      │ • Sub-5ms Return        │                 │   Groundedness Check     │
+      └─────────────────────────┘                 └────────────┬─────────────┘
+                                                               │
+                                                               ▼
+                                                  ┌──────────────────────────┐
+                                                  │  Action / Decision Node  │
+                                                  ├──────────────────────────┤
+                                                  │ • Safe → Forward to LLM  │
+                                                  │ • Risk → Block & Alert   │
+                                                  └──────────────────────────┘
