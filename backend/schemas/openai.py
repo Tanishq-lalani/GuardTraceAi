@@ -37,3 +37,4 @@ class GuardTraceResponse(BaseModel):
     usage: Optional[Dict[str, int]] = None
     guardtrace_meta: InspectionMetaData
 
+
