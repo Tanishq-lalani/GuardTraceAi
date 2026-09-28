@@ -1,9 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import engine
 from schemas.models import User
 from core.auth import hash_password, verify_password, create_access_token
 from schemas.auth_model import RegisterRequest, LoginRequest
+from core.dependencies import get_current_user_id
 
 router = APIRouter(
     prefix="/auth",
@@ -65,4 +66,24 @@ def login_user(data: LoginRequest):
             "access_token": access_token,
             "token_type": "bearer",
             "user_id": user.id
+        }
+
+@router.get("/me")
+def get_my_profile(
+    user_id: int = Depends(get_current_user_id)
+):
+
+    with Session(engine) as session:
+
+        user = session.get(User, user_id)
+
+        if not user:
+            return {
+                "error": "User not found"
+            }
+
+        return {
+            "user_id": user.id,
+            "name": user.name,
+            "email": user.email
         }
