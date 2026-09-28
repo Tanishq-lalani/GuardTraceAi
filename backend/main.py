@@ -6,6 +6,9 @@ from schemas.openai import (ChatCompletionRequest,GuardTraceResponse)
 from ml.risk_classifier import risk_classifier
 from core.cache import cache_engine
 from gemini_client import gemini_client
+from routes.conversation import router as conversation_router
+from routes.auth import router as auth_router
+from routes.message import router as message_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +31,12 @@ app = FastAPI(
     version="1.0.0", 
     lifespan=lifespan
 )
+
+app.include_router(conversation_router)
+app.include_router(auth_router)
+app.include_router(message_router)
+
+
 
 @app.get('/')
 async def root():
