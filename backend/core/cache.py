@@ -1,6 +1,7 @@
 import json
 import hashlib
 import redis.asyncio as aioredis
+from datetime import date
 from typing import Optional, Dict, Any, List
 from config import settings
 from schemas.openai import ChatMessage
@@ -21,7 +22,7 @@ class CacheEngine:
         if self.redis:
             await self.redis.close()
 
-    def generate_cache_key(self, model: str, messages: List[ChatMessage]) -> str:
+    def generate_cache_key(self, model: str, messages: List[ChatMessage], temperature: float = 0.7,top_p: float = 1.0, max_tokens: int | None = None) -> str:
         """
         Generates a deterministic SHA-256 hash key based on the model name and message history.
         
@@ -33,7 +34,10 @@ class CacheEngine:
             {
                 "model": model,
                 # Convert Pydantic ChatMessage objects to standard dicts
-                "messages": [m.model_dump() for m in messages]
+                "messages": [m.model_dump() for m in messages],
+                "temperature": temperature,
+                "top_p": top_p,
+                "max_tokens": max_tokens
             },
             sort_keys=True  # Sorting keys ensures consistent ordering
         )   
@@ -59,5 +63,50 @@ class CacheEngine:
                 value=json.dumps(data),
                 ex=settings.REDIS_TTL_SECONDS  # Key auto-deletes after 3600 seconds (1 hour)
             )
+
+    def generate_usage_key(self, user_id: int) -> str:
+
+        today = date.today().isoformat()
+
+        return f"gt_usage:{user_id}:{today}"
+
+    async def get_usage(self, user_id: int) -> int:
+
+        if not self.redis:
+            return 0
+
+        key = self.generate_usage_key(user_id)
+
+        value = await self.redis.get(key)
+
+        if value is None:
+            return 0
+
+        return int(value)
+
+    async def increment_usage(
+        self,
+        user_id: int
+    ) -> int:
+
+        if not self.redis:
+            return 0
+
+        key = self.generate_usage_key(user_id)
+
+        count = await self.redis.incr(key)
+
+        # Keep the counter for 24 hours.
+        # The date-based key ensures a new counter is
+        # automatically used on the next calendar day.
+        if count == 1:
+            await self.redis.expire(
+                key,
+                86400
+            )
+
+        return count
+
+    
 
 cache_engine = CacheEngine()
