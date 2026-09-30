@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
     REDIS_TTL_SECONDS: int = 3600
+    FREE_DAILY_LIMIT: int = os.getenv("FREE_DAILY_LIMIT")
 
     class Config:
         env_file = ".env"
