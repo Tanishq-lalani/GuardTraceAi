@@ -28,8 +28,11 @@ def register_user(data: RegisterRequest):
         user = User(
             name=data.name,
             email=data.email,
-            password_hash=password_hash
+            password_hash=password_hash,
+            role="admin",
+            is_active=True
         )
+
 
         session.add(user)
         session.commit()
@@ -59,13 +62,20 @@ def login_user(data: LoginRequest):
                 "error": "Invalid email or password"
             }
 
+        if not user.is_active:
+            return {
+                "error": "Account is Inactive"
+            }
+        
+
         access_token = create_access_token(user.id)
 
         return {
             "message": "Login successful",
             "access_token": access_token,
             "token_type": "bearer",
-            "user_id": user.id
+            "user_id": user.id,
+            "role": user.role
         }
 
 @router.get("/me")
@@ -85,5 +95,7 @@ def get_my_profile(
         return {
             "user_id": user.id,
             "name": user.name,
-            "email": user.email
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active
         }
