@@ -34,3 +34,25 @@ def create_conversation(
             "conversation_id": conversation.id,
             "title": conversation.title
         }
+
+@router.get("")
+def get_my_conversations(
+    user_id: int = Depends(get_current_user_id)
+):
+
+    with Session(engine) as session:
+
+        conversations = (
+            session.query(Conversation)
+            .filter(Conversation.user_id == user_id)
+            .order_by(Conversation.id.desc())
+            .all()
+        )
+
+        return [
+            {
+                "conversation_id": conversation.id,
+                "title": conversation.title
+            }
+            for conversation in conversations
+        ]

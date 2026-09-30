@@ -55,3 +55,46 @@ def create_message(
             "role": message.role,
             "content": message.content
         }
+
+@router.get("/{conversation_id}/messages")
+def get_messages(
+    conversation_id: int,
+    user_id: int = Depends(get_current_user_id)
+):
+
+    with Session(engine) as session:
+
+        conversation = session.get(
+            Conversation,
+            conversation_id
+        )
+
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+
+        if conversation.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this conversation"
+            )
+
+        messages = (
+            session.query(Message)
+            .filter(
+                Message.conversation_id == conversation_id
+            )
+            .order_by(Message.id.asc())
+            .all()
+        )
+
+        return [
+            {
+                "message_id": message.id,
+                "role": message.role,
+                "content": message.content
+            }
+            for message in messages
+        ]
