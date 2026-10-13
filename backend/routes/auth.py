@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import engine
 from schemas.models import User
@@ -19,9 +19,10 @@ def register_user(data: RegisterRequest):
         ).first()
 
         if existing_user:
-            return {
-                "error": "User with this email already exists"
-            }
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email already exists",
+            )
 
         password_hash = hash_password(data.password)
 
