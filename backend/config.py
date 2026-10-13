@@ -1,12 +1,22 @@
 import os
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "GuardTrace AI Gateway"
     VERSION: str = "0.1.0"
     API_PREFIX: str = "/v1"
 
-    # Upstream Gemini Configuration (Using OpenAI-compatible route)
+    # Database
+    DATABASE_URL: str
+
+    # JWT Authentication
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
+
+    # Upstream Gemini Configuration
     UPSTREAM_GEMINI_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     DEFAULT_MODEL: str = "gemini-1.5-flash"
@@ -15,9 +25,13 @@ class Settings(BaseSettings):
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
     REDIS_TTL_SECONDS: int = 3600
-    FREE_DAILY_LIMIT: int = os.getenv("FREE_DAILY_LIMIT")
+
+    # Free daily limit
+    FREE_DAILY_LIMIT: int = int(os.getenv("FREE_DAILY_LIMIT", 20))
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
+
 
 settings = Settings()
