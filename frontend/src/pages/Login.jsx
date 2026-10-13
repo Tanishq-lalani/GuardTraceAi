@@ -1,17 +1,56 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import axiosInstance from "../axiosInstance";
+
+
+
+
+
+
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log({
-      email,
-      password,
-    });
+    setError("")
+    setLoading(true)
+    try {
+      const response = await axiosInstance.post("/auth/login", {
+        email,
+        password,
+      });
+
+      // Backend currently returns {"error": "..."} with status 200 on failure
+      if (response.data.error) {
+        setError(response.data.error);
+        return;
+      }
+
+      localStorage.setItem("access_token", response.data.access_token);
+      localStorage.setItem("role", response.data.role);
+      navigate("/dashboard");
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+
+      if (typeof detail === "string") {
+        setError(detail);
+      } else if (Array.isArray(detail)) {
+        setError(detail.map((d) => d.msg).join(", "));
+      } else if (!err.response) {
+        setError("Cannot reach the server. Is the backend running?");
+      } else {
+        setError("Login failed");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
@@ -48,12 +87,16 @@ function Login() {
               required
             />
           </div>
-          <button
-            type="submit"
-            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700"
-          >
-            Login
-          </button>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+<button
+  type="submit"
+  disabled={loading}
+  className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+>
+  {loading ? "Signing in..." : "Login"}
+</button>
           <div className="mt-6 text-center">
     <p className="text-sm text-gray-500">
         Don't have an account?{" "}

@@ -1,133 +1,226 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import axiosInstance from "../axiosInstance";
-import { Link } from "react-router-dom";
+
+function getErrorMessage(err) {
+  if (!err.response) {
+    return "Cannot reach the server. Please check your connection and try again.";
+  }
+  const detail = err.response.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    // FastAPI 422 validation errors
+    return detail.map((d) => d.msg.replace("Value error, ", "")).join(". ");
+  }
+  if (err.response.status >= 500) return "Server error. Please try again later.";
+  return "Registration failed. Please try again.";
+}
 
 function Register() {
-    const [name, setName] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [emailExists, setEmailExists] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+  // After success, show the message briefly, then go to login
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => {
+      navigate("/login", { replace: true, state: { registered: true, email: form.email } });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [success, navigate, form.email]);
 
-        setMessage("");
-        setError("");
+  // Already logged in? No need to register
+  if (localStorage.getItem("access_token")) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
-        try {
-            const response = await axiosInstance.post("/auth/register", {
-                name,
-                email,
-                password,
-            });
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    setError("");
+    setEmailExists(false);
+  };
 
-            setMessage(response.data.message);
-        } catch (err) {
-            setError(
-                err.response?.data?.detail ||
-                err.response?.data?.error ||
-                "Registration failed"
-            );
-        }
-    };
+  const validate = () => {
+    if (form.name.trim().length < 2) return "Name must be at least 2 characters.";
+    if (form.password.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) {
+      return "Password must contain at least one letter and one number.";
+    }
+    if (form.password !== form.confirmPassword) return "Passwords do not match.";
+    return "";
+  };
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (loading || success) return; // prevent double submit
 
-                <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-bold text-gray-900">
-                        GuardTraceAI
-                    </h1>
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
-                    <p className="mt-2 text-gray-500">
-                        Register Admin Account
-                    </p>
-                </div>
+    setLoading(true);
+    setError("");
+    setEmailExists(false);
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+    try {
+      await axiosInstance.post("/auth/register", {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(getErrorMessage(err));
+      if (err.response?.status === 409) setEmailExists(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">
-                            Name
-                        </label>
+  const inputClass =
+    "w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 disabled:bg-gray-100";
 
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Enter your name"
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">
-                            Email
-                        </label>
-
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your email"
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700">
-                            Password
-                        </label>
-
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter your password"
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
-
-                    {message && (
-                        <p className="text-sm text-green-600">
-                            {message}
-                        </p>
-                    )}
-
-                    {error && (
-                        <p className="text-sm text-red-600">
-                            {error}
-                        </p>
-                    )}
-
-                    <button
-                        type="submit"
-                        className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700"
-                    >
-                        Register Admin
-                    </button>
-                    <div className="mt-6 text-center">
-    <p className="text-sm text-gray-500">
-        Already have an account?{" "}
-        <Link
-            to="/login"
-            className="font-medium text-blue-600 hover:text-blue-700"
-        >
-            Login
-        </Link>
-    </p>
-</div>
-
-                </form>
-            </div>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900">GuardTraceAI</h1>
+          <p className="mt-2 text-gray-500">Create your account</p>
         </div>
-    );
+
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <div>
+            <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
+              Name
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              value={form.name}
+              onChange={handleChange}
+              placeholder="Enter your name"
+              className={inputClass}
+              disabled={loading || success}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="Enter your email"
+              className={inputClass}
+              disabled={loading || success}
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="At least 8 characters, with a letter and a number"
+                className={`${inputClass} pr-16`}
+                disabled={loading || success}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-3 text-sm text-gray-500 hover:text-gray-700"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-gray-700">
+              Confirm password
+            </label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              value={form.confirmPassword}
+              onChange={handleChange}
+              placeholder="Re-enter your password"
+              className={inputClass}
+              disabled={loading || success}
+              required
+            />
+          </div>
+
+          {error && (
+            <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              {error}
+              {emailExists && (
+                <>
+                  {" "}
+                  <Link to="/login" className="font-medium underline">
+                    Go to login
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+
+          {success && (
+            <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
+              Account created successfully. Redirecting to login...
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || success}
+            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+          >
+            {loading ? "Creating account..." : "Register"}
+          </button>
+
+          <p className="text-center text-sm text-gray-500">
+            Already have an account?{" "}
+            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-700">
+              Login
+            </Link>
+          </p>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 export default Register;
