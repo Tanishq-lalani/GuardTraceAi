@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.cache import cache_engine
 
@@ -8,7 +9,8 @@ from routes.auth import router as auth_router
 from routes.conversation import router as conversation_router
 from routes.message import router as message_router
 from routes.chat import router as chat_router
-
+from routes.admin import router as admin_router
+from config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,10 +34,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(conversation_router)
 app.include_router(auth_router)
 app.include_router(message_router)
 app.include_router(chat_router)
+app.include_router(admin_router)
 
 
 
