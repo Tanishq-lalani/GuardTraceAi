@@ -11,6 +11,7 @@ from routes.message import router as message_router
 from routes.chat import router as chat_router
 from routes.admin import router as admin_router
 from config import settings
+from ml.risk_classifier import risk_classifier
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     print("GuardTraceAI stopped") 
     print("Redis connection closed")
 
+risk_classifier.warm_up() 
 
 app = FastAPI(
     title="GuardTraceAi",
