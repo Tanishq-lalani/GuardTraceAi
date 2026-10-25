@@ -20,6 +20,7 @@ function Register() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
+    organization_name: "",
     name: "",
     email: "",
     password: "",
@@ -30,7 +31,6 @@ function Register() {
   const [error, setError] = useState("");
   const [emailExists, setEmailExists] = useState(false);
   const [success, setSuccess] = useState(false);
-
   // After success, show the message briefly, then go to login
   useEffect(() => {
     if (!success) return;
@@ -40,9 +40,10 @@ function Register() {
     return () => clearTimeout(timer);
   }, [success, navigate, form.email]);
 
-  // Already logged in? No need to register
+  // Already logged in? Send them to their own home page
   if (localStorage.getItem("access_token")) {
-    return <Navigate to="/dashboard" replace />;
+    const role = localStorage.getItem("role");
+    return <Navigate to={role === "admin" ? "/admin" : "/dashboard"} replace />;
   }
 
   const handleChange = (e) => {
@@ -52,8 +53,11 @@ function Register() {
   };
 
   const validate = () => {
+    if (form.organization_name.trim().length < 2)
+      return "Organization name must be at least 2 characters.";
     if (form.name.trim().length < 2) return "Name must be at least 2 characters.";
     if (form.password.length < 8) return "Password must be at least 8 characters.";
+    if (form.password.length > 72) return "Password must be at most 72 characters.";
     if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) {
       return "Password must contain at least one letter and one number.";
     }
@@ -77,6 +81,7 @@ function Register() {
 
     try {
       await axiosInstance.post("/auth/register", {
+        organization_name: form.organization_name.trim(),
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
@@ -98,13 +103,31 @@ function Register() {
       <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900">GuardTraceAI</h1>
-          <p className="mt-2 text-gray-500">Create your account</p>
+          <p className="mt-2 text-gray-500">Register your organization</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <div>
+            <label htmlFor="organization_name" className="mb-2 block text-sm font-medium text-gray-700">
+              Organization name
+            </label>
+            <input
+              id="organization_name"
+              name="organization_name"
+              type="text"
+              autoComplete="organization"
+              value={form.organization_name}
+              onChange={handleChange}
+              placeholder="Enter your company or organization name"
+              className={inputClass}
+              disabled={loading || success}
+              required
+            />
+          </div>
+
+          <div>
             <label htmlFor="name" className="mb-2 block text-sm font-medium text-gray-700">
-              Name
+              Admin name
             </label>
             <input
               id="name"
@@ -122,7 +145,7 @@ function Register() {
 
           <div>
             <label htmlFor="email" className="mb-2 block text-sm font-medium text-gray-700">
-              Email
+              Admin email
             </label>
             <input
               id="email"
@@ -199,7 +222,7 @@ function Register() {
 
           {success && (
             <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-              Account created successfully. Redirecting to login...
+              Organization created successfully. Redirecting to login...
             </div>
           )}
 
@@ -208,7 +231,7 @@ function Register() {
             disabled={loading || success}
             className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
           >
-            {loading ? "Creating account..." : "Register"}
+            {loading ? "Creating organization..." : "Register organization"}
           </button>
 
           <p className="text-center text-sm text-gray-500">
