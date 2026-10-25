@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # Upstream Gemini Configuration
     UPSTREAM_GEMINI_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    DEFAULT_MODEL: str = "gemini-1.5-flash"
+    DEFAULT_MODEL: str = "gemini-3.6-flash"
 
     # Redis Cache Configuration
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
@@ -28,6 +28,9 @@ class Settings(BaseSettings):
 
     # Free daily limit
     FREE_DAILY_LIMIT: int = int(os.getenv("FREE_DAILY_LIMIT", 20))
+    PII_CONFIDENCE_THRESHOLD: float = 0.5
+    ENABLE_ML_CLASSIFIER: bool = False
+    ML_MODEL_NAME: str = "protectai/deberta-v3-base-prompt-injection-v2"
 
     class Config:
         env_file = ".env"
