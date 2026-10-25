@@ -1,20 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../axiosInstance";
-
-
-
-
-
-
-
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("")
@@ -30,10 +23,19 @@ function Login() {
         setError(response.data.error);
         return;
       }
+      console.log("Login response:", response.data);
+      console.log("Role received:", response.data.role);
+
 
       localStorage.setItem("access_token", response.data.access_token);
       localStorage.setItem("role", response.data.role);
-      navigate("/dashboard");
+      localStorage.setItem("must_change_password", String(response.data.must_change_password));
+      if (response.data.must_change_password) navigate("/change-password");
+      if (response.data.role === "admin") {
+  navigate("/admin", { replace: true });
+} else {
+  navigate("/dashboard", { replace: true });
+}
     } catch (err) {
       const detail = err.response?.data?.detail;
 
