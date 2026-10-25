@@ -22,7 +22,7 @@ def get_current_user(user_id: int = Depends(get_current_user_id)) -> User:
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User Nor Found"
+                detail="User Not Found"
             )
         if not user.is_active:
             raise HTTPException(
@@ -32,20 +32,10 @@ def get_current_user(user_id: int = Depends(get_current_user_id)) -> User:
         return user
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role not in ["admin","controller"]:
+    if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    return user
-
-def require_controller(
-        user: User = Depends(get_current_user)
-) -> User:
-    if user.role != "controller":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Controller access required"
+            detail="Admin access required",
         )
     return user
 
