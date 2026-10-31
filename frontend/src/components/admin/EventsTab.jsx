@@ -39,18 +39,18 @@ export default function EventsTab({ onOpen }) {
             setOffset(0);
           }}
         />
-        <select value={severity} onChange={filter(setSeverity)} className={inputCls}>
+        <select aria-label="Filter by severity" value={severity} onChange={filter(setSeverity)} className={inputCls}>
           <option value="">All severities</option>
           <option value="high">High</option>
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        <select value={eventType} onChange={filter(setEventType)} className={inputCls}>
+        <select aria-label="Filter by event type" value={eventType} onChange={filter(setEventType)} className={inputCls}>
           <option value="">All types</option>
           <option value="BLOCKED_PROMPT">Blocked prompt</option>
           <option value="PROMPT_INJECTION">Prompt injection</option>
         </select>
-        <select value={userId} onChange={filter(setUserId)} className={inputCls}>
+        <select aria-label="Filter by employee" value={userId} onChange={filter(setUserId)} className={inputCls}>
           <option value="">All employees</option>
           {(users.data || [])
             .filter((u) => u.role === "user")

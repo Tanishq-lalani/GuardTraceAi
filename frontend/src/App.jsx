@@ -1,32 +1,47 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
-import Login from './pages/Login'
-import Register from './pages/Register'
 import './App.css'
-import Dashboard from './pages/Dashboard'
-import AdminDashboard from './pages/AdminDashboard'
 import ProtectedRoute from './pages/ProtectedRoute'
+import ThemeProvider from './context/ThemeProvider'
+import PublicLayout from './layouts/PublicLayout'
+
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const HomePage = lazy(() => import('./pages/HomePage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const ChangePassword = lazy(() => import('./pages/ChangePassword'))
+
+function getHomePath() {
+  if (localStorage.getItem("must_change_password") === "true") return "/change-password";
+  return localStorage.getItem("role") === "admin" ? "/admin" : "/dashboard";
+}
 
 function App() {
-  const role = localStorage.getItem("role")
   return (
-    <>
-     <BrowserRouter>
-     <Routes>
-     <Route path="/login" element={<Login />} />
-     <Route path="/register" element={<Register />} />
-      {/* Employees only */}
-      <Route element={<ProtectedRoute role="user" />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-      </Route>
-      {/* Admins only */}
-      <Route element={<ProtectedRoute role="admin" />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-      </Route>
-     <Route path="*" element={<Navigate to="/login" replace />}/>
-     </Routes>
-     </BrowserRouter>
-     <h1>Hello World</h1>
-    </>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Suspense fallback={<div className="grid min-h-screen place-items-center text-sm text-slate-500">Loading GuardTraceAI…</div>}>
+          <Routes>
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+            </Route>
+            <Route element={<ProtectedRoute passwordChange />}>
+              <Route path="/change-password" element={<ChangePassword />} />
+            </Route>
+            <Route element={<ProtectedRoute role="user" />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+            </Route>
+            <Route element={<ProtectedRoute role="admin" />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+            </Route>
+            <Route path="*" element={<Navigate to={localStorage.getItem("access_token") ? getHomePath() : "/"} replace />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

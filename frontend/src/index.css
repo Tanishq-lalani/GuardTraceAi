@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply text-slate-900 antialiased;
+  }
+}

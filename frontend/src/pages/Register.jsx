@@ -43,7 +43,12 @@ function Register() {
   // Already logged in? Send them to their own home page
   if (localStorage.getItem("access_token")) {
     const role = localStorage.getItem("role");
-    return <Navigate to={role === "admin" ? "/admin" : "/dashboard"} replace />;
+    const destination = localStorage.getItem("must_change_password") === "true"
+      ? "/change-password"
+      : role === "admin"
+        ? "/admin"
+        : "/dashboard";
+    return <Navigate to={destination} replace />;
   }
 
   const handleChange = (e) => {
@@ -99,10 +104,11 @@ function Register() {
     "w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-blue-500 disabled:bg-gray-100";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-lg">
+    <div className="auth-page flex w-full items-center justify-center px-4 py-10">
+      <div className="auth-panel w-full max-w-md rounded-2xl p-8 sm:p-10">
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">GuardTraceAI</h1>
+          <div className="brand-mark mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl text-lg font-bold text-white">G</div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">GuardTraceAI</h1>
           <p className="mt-2 text-gray-500">Register your organization</p>
         </div>
 
@@ -229,7 +235,7 @@ function Register() {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+            className="primary-button w-full rounded-lg bg-blue-600 py-3 font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
           >
             {loading ? "Creating organization..." : "Register organization"}
           </button>

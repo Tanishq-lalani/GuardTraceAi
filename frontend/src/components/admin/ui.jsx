@@ -55,7 +55,12 @@ export function Empty({ children }) {
 
 export function DaysSelect({ value, onChange }) {
   return (
-    <select value={value} onChange={(e) => onChange(Number(e.target.value))} className={inputCls}>
+    <select
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className={inputCls}
+      aria-label="Activity time range"
+    >
       <option value={7}>Last 7 days</option>
       <option value={30}>Last 30 days</option>
       <option value={90}>Last 90 days</option>

@@ -135,7 +135,7 @@ function EmployeeDetail({ id, onBack }) {
               <ErrorBox>{convo.error}</ErrorBox>
             </div>
           ) : (
-            <div className="max-h-[32rem] space-y-3 overflow-y-auto p-4">
+            <div className="max-h-128 space-y-3 overflow-y-auto p-4">
               {convo.data.messages.map((m) => (
                 <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                   <div

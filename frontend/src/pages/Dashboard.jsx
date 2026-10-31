@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import axiosInstance from "../axiosInstance";
+import WorkspaceLayout from "../layouts/WorkspaceLayout";
 
 function getErrorMessage(err) {
   if (!err.response) return "Cannot reach the server.";
@@ -25,7 +25,6 @@ function getErrorMessage(err) {
 }
 
 function Dashboard() {
-  const navigate = useNavigate();
   const bottomRef = useRef(null);
   const skipNextLoad = useRef(false);
 
@@ -38,9 +37,11 @@ function Dashboard() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [error, setError] = useState("");
   const [usage, setUsage] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   useEffect(() => {
-    axiosInstance.get("/auth/me").then((res) => setUser(res.data)).catch(() => {});
+    axiosInstance.get("/auth/me").then((res) => setUser(res.data)).catch((err) => setError(getErrorMessage(err)));
     loadConversations();
   }, []);
 
@@ -49,8 +50,11 @@ function Dashboard() {
       skipNextLoad.current = false;
       return;
     }
-    if (activeId) loadMessages(activeId);
-    else setMessages([]);
+    if (!activeId) return;
+
+    const controller = new AbortController();
+    loadMessages(activeId, controller.signal);
+    return () => controller.abort();
   }, [activeId]);
 
   useEffect(() => {
@@ -60,21 +64,32 @@ function Dashboard() {
   async function loadConversations() {
     try {
       const res = await axiosInstance.get("/conversations");
-      setConversations(Array.isArray(res.data) ? res.data : []);
+      setConversations(
+        Array.isArray(res.data)
+          ? res.data.map((conversation) => ({
+              ...conversation,
+              id: conversation.id ?? conversation.conversation_id,
+            }))
+          : [],
+      );
     } catch (err) {
       setError(getErrorMessage(err));
     }
   }
 
-  async function loadMessages(id) {
+  async function loadMessages(id, signal) {
     setLoadingMessages(true);
     try {
-      const res = await axiosInstance.get(`/conversations/${id}/messages`);
-      setMessages(Array.isArray(res.data) ? res.data : []);
+      const res = await axiosInstance.get(`/conversations/${id}/messages`, { signal });
+      setMessages(
+        Array.isArray(res.data)
+          ? res.data.map((message) => ({ ...message, id: message.id ?? message.message_id }))
+          : [],
+      );
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (!signal?.aborted) setError(getErrorMessage(err));
     } finally {
-      setLoadingMessages(false);
+      if (!signal?.aborted) setLoadingMessages(false);
     }
   }
 
@@ -88,6 +103,8 @@ function Dashboard() {
     setError("");
     setActiveId(null);
     setMessages([]);
+    setLoadingMessages(false);
+    setSidebarOpen(false);
   }
 
   async function handleSend(e) {
@@ -126,17 +143,31 @@ function Dashboard() {
     }
   }
 
-  function handleLogout() {
-    ["access_token", "role", "must_change_password"].forEach((k) => localStorage.removeItem(k));
-    navigate("/login", { replace: true });
-  }
-
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <aside className="flex w-64 flex-col border-r border-gray-200 bg-white">
-        <div className="border-b border-gray-200 p-4">
-          <h1 className="text-xl font-bold text-gray-900">GuardTraceAI</h1>
+    <WorkspaceLayout user={user} className="workspace-layout-chat">
+    <div className={`dashboard-shell flex min-h-0 flex-1 overflow-hidden bg-gray-100 ${sidebarExpanded ? "" : "sidebar-collapsed"}`}>
+      {sidebarOpen && (
+        <button
+          aria-label="Close conversation menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-20 bg-slate-950/40 md:hidden"
+        />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-gray-200 bg-white shadow-xl transition-transform md:static md:z-auto md:w-64 md:translate-x-0 md:shadow-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-gray-900">Conversations</h2>
+            <p className="mt-1 text-xs text-gray-500">Private AI workspace</p>
+          </div>
+          <button
+            type="button"
+            className="sidebar-collapse-button hidden rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 md:block"
+            onClick={() => setSidebarExpanded(false)}
+            aria-label="Collapse conversation sidebar"
+            title="Collapse sidebar"
+          >
+            ←
+          </button>
         </div>
 
         <div className="p-3">
@@ -158,6 +189,7 @@ function Dashboard() {
               onClick={() => {
                 setError("");
                 setActiveId(c.id);
+                setSidebarOpen(false);
               }}
               className={`w-full truncate rounded-lg px-3 py-2 text-left text-sm ${
                 c.id === activeId
@@ -176,23 +208,42 @@ function Dashboard() {
           {user?.organization_name && (
             <p className="truncate text-xs text-gray-400">{user.organization_name}</p>
           )}
-          <button
-            onClick={handleLogout}
-            className="mt-3 w-full rounded-lg border border-gray-300 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Logout
-          </button>
         </div>
       </aside>
 
       {/* Chat area */}
-      <main className="flex flex-1 flex-col">
-        <div className="flex-1 overflow-y-auto p-6">
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3">
+          {!sidebarExpanded && (
+            <button
+              type="button"
+              className="sidebar-expand-button hidden rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 md:block"
+              onClick={() => setSidebarExpanded(true)}
+              aria-label="Expand conversation sidebar"
+            >
+              ☰
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Open conversation menu"
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 md:hidden"
+          >
+            Menu
+          </button>
+          <p className="truncate text-sm font-semibold text-gray-900">
+            {conversations.find((conversation) => conversation.id === activeId)?.title || "New conversation"}
+          </p>
+        </header>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="mx-auto max-w-3xl space-y-4">
             {messages.length === 0 && !loadingMessages && (
-              <p className="mt-20 text-center text-gray-400">
-                Start a conversation by typing a message below.
-              </p>
+              <div className="mx-auto mt-16 max-w-lg text-center sm:mt-24">
+                <div className="brand-mark mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl text-xl font-bold text-white">G</div>
+                <h2 className="text-xl font-semibold text-gray-900">A safer space to work with AI</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-500">Start a conversation below. Messages are checked for sensitive information before they are sent.</p>
+              </div>
             )}
             {loadingMessages && <p className="text-center text-gray-400">Loading...</p>}
 
@@ -243,6 +294,7 @@ function Dashboard() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="Type your message..."
               disabled={sending}
+              aria-label="Message"
               className="flex-1 rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:bg-gray-100"
             />
             <button
@@ -256,6 +308,7 @@ function Dashboard() {
         </form>
       </main>
     </div>
+    </WorkspaceLayout>
   );
 }
 

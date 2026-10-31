@@ -15,6 +15,8 @@ function EmployeesTab({ onOpen }) {
   const [formError, setFormError] = useState("");
   const [actionError, setActionError] = useState("");
   const [credential, setCredential] = useState(null);
+  const [credentialCopied, setCredentialCopied] = useState(false);
+  const [credentialError, setCredentialError] = useState("");
   const [busyId, setBusyId] = useState(null);
 
   const rows = useMemo(() => {
@@ -41,6 +43,8 @@ function EmployeesTab({ onOpen }) {
         email: form.email.trim().toLowerCase(),
       });
       setCredential({ label: `Account created for ${res.data.user.email}`, password: res.data.temporary_password });
+      setCredentialCopied(false);
+      setCredentialError("");
       setForm({ name: "", email: "" });
       setShowForm(false);
       refresh();
@@ -72,11 +76,26 @@ function EmployeesTab({ onOpen }) {
     try {
       const res = await axiosInstance.post(`/admin/users/${u.id}/reset-password`);
       setCredential({ label: `New temporary password for ${u.email}`, password: res.data.temporary_password });
+      setCredentialCopied(false);
+      setCredentialError("");
       refresh();
     } catch (err) {
       setActionError(errMsg(err));
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function copyCredential() {
+    setCredentialError("");
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard access is unavailable in this browser.");
+      }
+      await navigator.clipboard.writeText(credential.password);
+      setCredentialCopied(true);
+    } catch {
+      setCredentialError("Could not copy the password. Select and copy it manually.");
     }
   }
 
@@ -112,15 +131,23 @@ function EmployeesTab({ onOpen }) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <code className="rounded-lg border border-amber-200 bg-white px-4 py-2 font-mono text-slate-900">{credential.password}</code>
             <button
-              onClick={() => navigator.clipboard.writeText(credential.password)}
+              onClick={copyCredential}
               className="rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium hover:bg-amber-100"
             >
-              Copy
+              {credentialCopied ? "Copied" : "Copy"}
             </button>
-            <button onClick={() => setCredential(null)} className="text-sm text-amber-900 underline">
+            <button
+              onClick={() => {
+                setCredential(null);
+                setCredentialCopied(false);
+                setCredentialError("");
+              }}
+              className="text-sm text-amber-900 underline"
+            >
               Dismiss
             </button>
           </div>
+          {credentialError && <p role="alert" className="mt-3 text-sm text-red-700">{credentialError}</p>}
         </section>
       )}
 
