@@ -23,3 +23,28 @@
                                                   │ • Safe → Forward to LLM  │
                                                   │ • Risk → Block & Alert   │
                                                   └──────────────────────────┘
+
+
+main.py
+   │
+   ├── auth_router
+   │      ├── register
+   │      ├── login
+   │      └── me
+   │
+   ├── conversation_router
+   │      ├── create conversation
+   │      └── list conversations
+   │
+   ├── message_router
+   │      ├── add message
+   │      └── get messages
+   │
+   └── chat_router
+          │
+          ├── JWT authentication
+          ├── conversation ownership
+          ├── security inspection
+          ├── Redis cache
+          ├── Gemini
+          └── PostgreSQL history

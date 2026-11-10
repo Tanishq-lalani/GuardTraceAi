@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+import asyncio
+from core.cache import cache_engine
 
 from core.auth import create_access_token, hash_password, verify_password
 from core.dependencies import get_current_user_id
@@ -12,6 +14,25 @@ from schemas.models import Organization, User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+
+DUMMY_HASH = hash_password("not-a-real-password")
+
+
+def _authenticate(email: str, password: str):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.email == email).first()
+        valid = verify_password(password, user.password_hash if user else DUMMY_HASH)
+        if not user or not valid:
+            return "invalid", None
+        if not user.is_active:
+            return "inactive", None
+        user.last_login_at = datetime.now(timezone.utc)
+        session.commit()
+        return "ok", {
+            "id": user.id,
+            "role": user.role,
+            "must_change_password": user.must_change_password,
+        }
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register_organization(data: RegisterRequest):
@@ -50,29 +71,37 @@ def register_organization(data: RegisterRequest):
 
 
 @router.post("/login")
-def login_user(data: LoginRequest):
+async def login_user(data: LoginRequest, request: Request):
     email = data.email.strip().lower()
+    ip = request.client.host if request.client else "unknown"
 
-    with Session(engine) as session:
-        user = session.query(User).filter(User.email == email).first()
+    retry_after = await cache_engine.login_blocked(email, ip)
+    if retry_after:
+        minutes = -(-retry_after // 60)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed attempts. Try again in {minutes} minute(s).",
+            headers={"Retry-After": str(retry_after)},
+        )
 
-        if not user or not verify_password(data.password, user.password_hash):
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
-        if not user.is_active:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is inactive")
+    # bcrypt and the DB query are blocking, so keep them off the event loop
+    outcome, user = await asyncio.to_thread(_authenticate, email, data.password)
 
-        user.last_login_at = datetime.now(timezone.utc)
-        session.commit()
+    if outcome == "invalid":
+        await cache_engine.record_login_failure(email, ip)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+    if outcome == "inactive":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is inactive")
 
-        return {
-            "message": "Login successful",
-            "access_token": create_access_token(user.id),
-            "token_type": "bearer",
-            "user_id": user.id,
-            "role": user.role,
-            "must_change_password": user.must_change_password,
-        }
-
+    await cache_engine.clear_login_failures(email, ip)
+    return {
+        "message": "Login successful",
+        "access_token": create_access_token(user["id"]),
+        "token_type": "bearer",
+        "user_id": user["id"],
+        "role": user["role"],
+        "must_change_password": user["must_change_password"],
+    }
 
 @router.get("/me")
 def get_my_profile(user_id: int = Depends(get_current_user_id)):

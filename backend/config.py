@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL")
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
     # Upstream Gemini Configuration
     UPSTREAM_GEMINI_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     PII_CONFIDENCE_THRESHOLD: float = 0.5
     ENABLE_ML_CLASSIFIER: bool = False
     ML_MODEL_NAME: str = "protectai/deberta-v3-base-prompt-injection-v2"
+
+    LOGIN_MAX_ATTEMPTS: int = 5
+    LOGIN_MAX_ATTEMPTS_PER_IP: int = 20
+    LOGIN_WINDOW_SECONDS: int = 900
 
     class Config:
         env_file = ".env"

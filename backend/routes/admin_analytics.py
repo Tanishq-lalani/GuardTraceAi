@@ -3,11 +3,12 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import case, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
+from core.audit import log_action
 
 from core.dependencies import require_admin
 from database import engine
-from schemas.models import Conversation, Message, SecurityEvent, User
+from schemas.models import Conversation, Message, SecurityEvent, User, AuditLog
 
 router = APIRouter(prefix="/admin", tags=["Admin Analytics"])
 
@@ -282,6 +283,9 @@ def conversation_messages(conversation_id: int, admin: User = Depends(require_ad
         if not conv:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
 
+        log_action(session, admin, "conversation_viewed", target_user_id=conv.user_id, conversation_id=conv.id)
+        session.commit()
+
         msgs = (
             session.query(Message)
             .filter(Message.conversation_id == conv.id)
@@ -338,5 +342,36 @@ def list_events(
                     "user": {"id": u.id, "name": u.name, "email": u.email},
                 }
                 for e, u in rows
+            ],
+        }
+
+@router.get("/audit-log")
+def audit_log(
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    admin: User = Depends(require_admin),
+):
+    Target = aliased(User)
+    with Session(engine) as session:
+        q = (
+            session.query(AuditLog, User.name, Target.name)
+            .join(User, User.id == AuditLog.admin_id)
+            .outerjoin(Target, Target.id == AuditLog.target_user_id)
+            .filter(AuditLog.organization_id == admin.organization_id)
+        )
+        total = q.count()
+        rows = q.order_by(AuditLog.id.desc()).limit(limit).offset(offset).all()
+        return {
+            "total": total,
+            "items": [
+                {
+                    "id": a.id,
+                    "created_at": a.created_at,
+                    "action": a.action,
+                    "admin": admin_name,
+                    "target": target_name,
+                    "conversation_id": a.conversation_id,
+                }
+                for a, admin_name, target_name in rows
             ],
         }

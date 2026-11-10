@@ -5,6 +5,12 @@ from datetime import date
 from typing import Optional, Dict, Any, List
 from config import settings
 from schemas.openai import ChatMessage
+import logging
+from redis.exceptions import RedisError
+
+
+
+logger = logging.getLogger(__name__)
 
 class CacheEngine:
     def __init__(self):
@@ -22,25 +28,26 @@ class CacheEngine:
         if self.redis:
             await self.redis.close()
 
-    def generate_cache_key(self, model: str, messages: List[ChatMessage], temperature: float = 0.7,top_p: float = 1.0, max_tokens: int | None = None) -> str:
-        """
-        Generates a deterministic SHA-256 hash key based on the model name and message history.
-        
-        Example input: model="gemini-1.5-flash", messages=[{"role": "user", "content": "Hello"}]
-        Example key output: "gt_cache:a8f5f167f44f4964e6c998dee827110c..."
-        """
-        # Convert message objects into a sorted, serialized JSON string
+    def generate_cache_key(
+        self,
+        model: str,
+        messages: List[ChatMessage],
+        scope: str = "",
+        temperature: float = 0.7,
+        top_p: float = 1.0,
+        max_tokens: int | None = None,
+    ) -> str:
         serialized_payload = json.dumps(
             {
+                "scope": scope,   # e.g. "org:3", keeps tenants separate
                 "model": model,
-                # Convert Pydantic ChatMessage objects to standard dicts
                 "messages": [m.model_dump() for m in messages],
                 "temperature": temperature,
                 "top_p": top_p,
-                "max_tokens": max_tokens
+                "max_tokens": max_tokens,
             },
-            sort_keys=True  # Sorting keys ensures consistent ordering
-        )   
+            sort_keys=True,
+        )
         hash_digest = hashlib.sha256(serialized_payload.encode("utf-8")).hexdigest()
         return f"gt_cache:{hash_digest}"
 
@@ -107,6 +114,45 @@ class CacheEngine:
 
         return count
 
-    
+        # ---------- Login rate limiting ----------
+
+    @staticmethod
+    def _login_keys(email: str, ip: str) -> tuple[str, str]:
+        return f"gt_login_fail:{ip}:{email}", f"gt_login_fail_ip:{ip}"
+
+    async def login_blocked(self, email: str, ip: str) -> int:
+        """Seconds until the caller may retry, or 0 if not blocked."""
+        if not self.redis:
+            return 0
+        pair_key, ip_key = self._login_keys(email, ip)
+        try:
+            pair = int(await self.redis.get(pair_key) or 0)
+            per_ip = int(await self.redis.get(ip_key) or 0)
+            if pair >= settings.LOGIN_MAX_ATTEMPTS:
+                return max(await self.redis.ttl(pair_key), 1)
+            if per_ip >= settings.LOGIN_MAX_ATTEMPTS_PER_IP:
+                return max(await self.redis.ttl(ip_key), 1)
+        except RedisError:
+            logger.warning("Login rate limiter unavailable", exc_info=True)
+        return 0
+
+    async def record_login_failure(self, email: str, ip: str) -> None:
+        if not self.redis:
+            return
+        try:
+            for key in self._login_keys(email, ip):
+                count = await self.redis.incr(key)
+                if count == 1:
+                    await self.redis.expire(key, settings.LOGIN_WINDOW_SECONDS)
+        except RedisError:
+            logger.warning("Could not record login failure", exc_info=True)
+
+    async def clear_login_failures(self, email: str, ip: str) -> None:
+        if not self.redis:
+            return
+        try:
+            await self.redis.delete(self._login_keys(email, ip)[0])
+        except RedisError:
+            pass
 
 cache_engine = CacheEngine()

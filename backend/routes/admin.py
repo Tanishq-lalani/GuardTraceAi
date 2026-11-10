@@ -8,13 +8,17 @@ from core.dependencies import require_admin
 from database import engine
 from schemas.auth_model import CreateUserRequest, UserStatusRequest
 from schemas.models import User
+from core.audit import log_action
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 def _temp_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+    password = [secrets.choice(string.ascii_letters), secrets.choice(string.digits)]
+    password.extend(secrets.choice(alphabet) for _ in range(length - len(password)))
+    secrets.SystemRandom().shuffle(password)
+    return "".join(password)
 
 
 def _user_dict(u: User) -> dict:
@@ -64,6 +68,8 @@ def create_user(data: CreateUserRequest, admin: User = Depends(require_admin)):
         )
         try:
             session.add(user)
+            session.flush()                      # assigns user.id
+            log_action(session, admin, "user_created", target_user_id=user.id)
             session.commit()
             session.refresh(user)
         except IntegrityError:
@@ -94,6 +100,7 @@ def set_user_status(user_id: int, data: UserStatusRequest, admin: User = Depends
     with Session(engine) as session:
         user = _get_org_employee(session, admin, user_id)
         user.is_active = data.is_active
+        log_action(session, admin, "user_activated" if data.is_active else "user_deactivated", target_user_id=user.id)
         session.commit()
         session.refresh(user)
         return _user_dict(user)
@@ -106,5 +113,6 @@ def reset_user_password(user_id: int, admin: User = Depends(require_admin)):
         user = _get_org_employee(session, admin, user_id)
         user.password_hash = hash_password(temp_password)
         user.must_change_password = True
+        log_action(session, admin, "password_reset", target_user_id=user.id)
         session.commit()
         return {"message": "Password reset. It is shown only once.", "temporary_password": temp_password}
