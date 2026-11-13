@@ -1,16 +1,30 @@
-# React + Vite
+# GuardTraceAI frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend is a React application built with Vite.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Start the FastAPI backend from `backend/` using the environment variables described in `backend/.env` (do not commit that file).
+2. From this directory, install dependencies with `npm install`.
+3. Start the frontend with `npm run dev`.
 
-## React Compiler
+The API defaults to `http://127.0.0.1:8000`. Set `VITE_API_BASE_URL` in a frontend `.env` file to point at another backend URL, for example:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```env
+VITE_API_BASE_URL=https://api.example.com
+```
 
-## Expanding the Oxlint configuration
+## Frontend structure
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- `src/components/common/` contains shared branding, navigation, footer, and theme controls.
+- `src/components/admin/` contains the admin dashboard panels and reusable data UI.
+- `src/context/` contains the persisted light/dark theme provider and hook.
+- `src/layouts/` contains the public and authenticated workspace shells.
+- `src/pages/` contains route-level screens, including the public landing page and employee/admin workspaces.
+
+The theme preference is stored in browser local storage and follows the operating-system preference until a user chooses a theme.
+
+Useful commands:
+
+- `npm run lint` checks the frontend source.
+- `npm run build` creates the production bundle in `dist/`.
