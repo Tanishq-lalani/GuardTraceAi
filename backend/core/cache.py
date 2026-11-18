@@ -17,11 +17,33 @@ class CacheEngine:
         self.redis: Optional[aioredis.Redis] = None
 
     async def connect(self):
-        self.redis = aioredis.Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            decode_responses=True  # Automatically converts bytes to Python strings
-        )
+        """Connects to Redis using REDIS_URL if provided (ideal for Upstash), 
+        otherwise falls back to host/port/password configuration.
+        """
+        try:
+            # Check if a full connection URL (like Upstash rediss://) is configured
+            if getattr(settings, "REDIS_URL", None):
+                self.redis = aioredis.Redis.from_url(
+                    settings.REDIS_URL,
+                    decode_responses=True  # Automatically converts bytes to Python strings
+                )
+            else:
+                # Fallback to local individual host/port/password settings
+                self.redis = aioredis.Redis(
+                    host=settings.REDIS_HOST,
+                    port=settings.REDIS_PORT,
+                    password=getattr(settings, "REDIS_PASSWORD", None),
+                    ssl=getattr(settings, "REDIS_SSL", True),
+                    decode_responses=True
+                )
+            
+            # Optional: Test the connection immediately on startup
+            await self.redis.ping()
+            logger.info("Successfully connected to Redis cache engine.")
+            
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}", exc_info=True)
+            self.redis = None
 
     async def close(self):
         """Gracefully closes the Redis connection on server shutdown."""

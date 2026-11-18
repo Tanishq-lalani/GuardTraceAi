@@ -1,5 +1,6 @@
 import os
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -22,8 +23,11 @@ class Settings(BaseSettings):
     DEFAULT_MODEL: str = "gemini-3.6-flash"
 
     # Redis Cache Configuration
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+    REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD")
+    REDIS_SSL: bool = True
     REDIS_TTL_SECONDS: int = 3600
 
     # Free daily limit
