@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from core.cache import cache_engine
@@ -36,6 +36,18 @@ app = FastAPI(
     version="1.0.0", 
     lifespan=lifespan
 )
+
+
+@app.middleware("http")
+async def strip_api_prefix(request: Request, call_next):
+    # The deployed frontend calls /api/..., but every route here is mounted at
+    # the root (/auth/register, /chat, ...). Accept both forms.
+    path = request.scope["path"]
+    if path == "/api" or path.startswith("/api/"):
+        path = path[len("/api"):] or "/"
+        request.scope["path"] = path
+        request.scope["raw_path"] = path.encode("utf-8")
+    return await call_next(request)
 
 app.add_middleware(
     CORSMiddleware,
