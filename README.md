@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="frontend/public/favicon.svg" width="72" alt="GuardTraceAI logo" />
+
 
 # GuardTraceAI
 
